@@ -281,8 +281,8 @@ while hasFrame(v)
             % pause
             %imshow(J,'InitialMagnification',200);
             
-            s=sprintf('data/data_move_%i.png',cont);
-            imwrite(g,s);
+            %s=sprintf('data/data_move_%i.png',cont);
+            %imwrite(g,s);
             %end
         end%
         fprintf('cont:%i \t val:%f\n',cont, length(values_sel));
