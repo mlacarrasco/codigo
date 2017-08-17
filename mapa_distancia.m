@@ -1,7 +1,7 @@
 % Proyecto Elecmetal
 % Miguel A. Carrasco. (mlacarrasco@gmail.com)
-% v.0.1.% Determina la distancia entre todos los puntos y realiza
-% clustering
+% v.0.1.% Determina la distancia y clustering segun correlacion
+% v.0.2% agregado a GIT
 
 function SEL=mapa_distancia(pos, idx_i, idx_j, delta)
 
