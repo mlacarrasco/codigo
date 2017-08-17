@@ -11,8 +11,9 @@
 % v0.08 10-07-2017   %analizamos las trayectorias de un mismo punto.
 %Bloqueamos la que sean del mismo frame
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
-% v0.10 14-08-2017   %analisis por bandas
-% v0.11 17-08-2017   %analisis por bandas
+% v0.10 14-08-2017   %borrado de codigo extra
+% v0.11 17-08-2017   %analisis por nandas
+% v0.12 17-08-2017   % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
 
 
 
