@@ -11,7 +11,8 @@
 % v0.08 10-07-2017   %analizamos las trayectorias de un mismo punto.
 %Bloqueamos la que sean del mismo frame
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
-% v0.10 17-08-2017   %analisis por bandas
+% v0.10 14-08-2017   %analisis por bandas
+% v0.11 17-08-2017   %analisis por bandas
 
 
 
@@ -99,6 +100,7 @@ while hasFrame(v)
             center= [xoffSet, yoffSet]+radio_px-1;
             D= xy_ray(g, center, radio_px, cont, k_point, draw);
             
+            %tomamos la region y la convertimos en una columna
             %evaluamos la región con una red neuronal
             input=D(:)';%*vSted;
             outputs = net(input');
@@ -165,37 +167,12 @@ while hasFrame(v)
                         
                         ax= axis();
                         xa= ax(1):ax(2);
-                        yfit=P(1)*xa'+P(2)
+                        yfit=P(1)*xa'+P(2);
                         
                         %ploteamos la linea de tendencia.
                         hold on;plot(xa, yfit,'g-.');drawnow;
                     end
                     
-                    
-                    
-                    
-                    for i=id_start(1):id_finish(end)
-                        
-                        %punto (x,y) inicial
-                        xi= track(i,2);
-                        yi= track(i,3);
-                        
-                        %buscamos la columna donde se encuentra esta
-                        %seccion
-                        positions= D_TRACK.data(end-1:end,:); %coordenadas X-Y
-                        id_ini= find(sum(positions==repmat([xi,yi]',1,size(positions,2)))==2);
-                        
-                        % ¿cual es el mejor destino en el siguiente frame?
-                        % criterio 1. angulo y distancia
-                        % criterio 2. analisis de la forma en otras
-                        % secuencias (tracking en frames previos)
-                        
-                        %una vez que tenemos la trayectoria de todos
-                        %los puntos de interes, analizamos el matching
-                        
-                        
-                        
-                    end %end j
                     
                 catch
                     fprintf('waiting for more frames... \n')
@@ -299,11 +276,11 @@ for t=1:length(angle)
     D(t,:)=improfile(ima, xi(t,:),yi(t,:), radio_px);
 end
 
-bw= D>0;
-[I,J]= find(bw==1);
-idx  = find(bw==1);
-C= double(D(idx))./255;
-HA= hu(I,J,C);
+%bw= D>0;
+%[I,J]= find(bw==1);
+%idx  = find(bw==1);
+%C= double(D(idx))./255;
+%HA= hu(I,J,C);
 
 if (draw)
     hold on
@@ -329,7 +306,7 @@ if (cont>350 && sw)
             disp([choice ' No es bola.'])
             option = 0;
     end
-    dat = [HA, option];
+    %dat = [HA, option];
     
     s=sprintf('data/region_move_%i_%i.mat',cont,k);
     save(s,'D', 'dat');

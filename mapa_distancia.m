@@ -1,5 +1,11 @@
+% Proyecto Elecmetal
+% Miguel A. Carrasco. (mlacarrasco@gmail.com)
+% v.0.1.% Determina la distancia entre todos los puntos y realiza
+% clustering
+
 function SEL=mapa_distancia(pos, idx_i, idx_j, delta)
-%distancia euclidiana entre todos los puntos
+
+
 M=zeros(size(pos,2));
 SEL=[];
 for i=idx_i
