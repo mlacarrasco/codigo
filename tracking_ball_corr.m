@@ -22,11 +22,12 @@ close all;
 clear all;
 warning off;
 
-ratio =0.90;
+ratio =0.85;    % indice de correlacion de una region
+factor=0.6;    % factor de escala del video
 myVideo = VideoWriter('video_output/myfile_0.8.avi');
 myVideo.FrameRate=5;
 
-factor=0.6;
+
 open(myVideo);
 v= VideoReader('video_input/section_2.mov');
 
@@ -119,7 +120,7 @@ while hasFrame(v)
                 
                 %almacenamos las coordenadas de las regiones putativas
                 track= [track; cont center];
-                xy_ray_pintar(center, radio_px, draw);
+                %xy_ray_pintar(center, radio_px, draw);
                 
                 %revisamos los últimos xx estados
                 %determino los ciclos que son únicos
@@ -136,15 +137,7 @@ while hasFrame(v)
                     
                     id_start = find(track(:,1)==cont_sel);
                     id_finish =  find(track(end,1)==track);
-                    
-                    %analizamos la distancia de recorrido entre todos los
-                    %puntos
-                    DST=[];
-                    ANG=[];
-                    PTV=[];
-                    
-                    MATRIX=zeros(1,3);
-                    
+
                     res= corr(D_TRACK.data(1:end-3,:));
                     poss_xy= D_TRACK.data(end-1:end,:);
                     [px, py] =find(res>factor_corr & res < 1);
