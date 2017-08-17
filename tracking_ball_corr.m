@@ -9,7 +9,7 @@
 % v0.06. 23-06-2017  %tracking en una zona y classificación en otra
 % v0.07. 30-06-2017  %guardamos las regiones del tracking
 % v0.08 10-07-2017   %analizamos las trayectorias de un mismo punto.
-                     %Bloqueamos la que sean del mismo frame
+%Bloqueamos la que sean del mismo frame
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
 % v0.10 17-08-2017   %analisis por bandas
 
@@ -72,7 +72,7 @@ while hasFrame(v)
     
     
     c= normxcorr2(T, roi_area);
-    %%obtenemos un set de candidatos.. 
+    %%obtenemos un set de candidatos..
     %%los ordenamos de mayor a menor
     [values id] = sort(c(:), 'descend');
     id_sel= find(values(1:best_putatives)> ratio);
@@ -121,7 +121,7 @@ while hasFrame(v)
                 %revisamos los últimos xx estados
                 %determino los ciclos que son únicos
                 
-                %[WARNING]: esto habría que mejorar. 
+                %[WARNING]: esto habría que mejorar.
                 %            Potencial riego de limite de memoria
                 
                 
@@ -139,7 +139,7 @@ while hasFrame(v)
                     DST=[];
                     ANG=[];
                     PTV=[];
-               
+                    
                     MATRIX=zeros(1,3);
                     
                     res= corr(D_TRACK.data(1:end-3,:));
@@ -149,30 +149,30 @@ while hasFrame(v)
                     %si no esta vacio significa que existe una relación de
                     %similitud entre un patron y otro.
                     
-                     if (not(isempty(px)))
+                    if (not(isempty(px)))
                         %El clustering primero determina la distancia entre solo
                         %los puntos que cumplen una condición de similaridad.
                         %Luego realizamos un clustering basado en similitud de
                         %distancia. (analisis de dendograma)
-                         delta =1;
-                         SEL= mapa_distancia(poss_xy, px', py', delta);
-                      
-                         hold on; plot(SEL(1,:), SEL(2,:), 'bo')
-                         
-                         %determinamos un polinomio de grado 1 para crear
-                         %una linea de proyeccion del movimiento.
-                         P=polyfit(SEL(1,:), SEL(2,:), 1)
-                         
-                         ax= axis();
-                         xa= ax(1):ax(2);
-                         yfit=P(1)*xa'+P(2)
-                         
-                         %ploteamos la linea de tendencia.
-                         hold on;plot(xa, yfit,'g-.');drawnow;
-                     end
-                     
-                     
-                     
+                        delta =1;
+                        SEL= mapa_distancia(poss_xy, px', py', delta);
+                        
+                        hold on; plot(SEL(1,:), SEL(2,:), 'bo')
+                        
+                        %determinamos un polinomio de grado 1 para crear
+                        %una linea de proyeccion del movimiento.
+                        P=polyfit(SEL(1,:), SEL(2,:), 1)
+                        
+                        ax= axis();
+                        xa= ax(1):ax(2);
+                        yfit=P(1)*xa'+P(2)
+                        
+                        %ploteamos la linea de tendencia.
+                        hold on;plot(xa, yfit,'g-.');drawnow;
+                    end
+                    
+                    
+                    
                     
                     for i=id_start(1):id_finish(end)
                         
@@ -193,88 +193,23 @@ while hasFrame(v)
                         %una vez que tenemos la trayectoria de todos
                         %los puntos de interes, analizamos el matching
                         
-                        for j= i:id_finish
-                            
-                            if (i~=j)
-                                
-                                %punto (x,y) de destino
-                                xe= track(j,2);
-                                ye= track(j,3);
-                                
-                                
-                                id_end= find(sum(positions==repmat([xe,ye]',1,size(positions,2)))==2);
-                                
-                                if (draw)
-                                    hold on
-                                    plot(xi,yi, 'r*');
-                                    plot(xe,ye, 'g*');
-                                    hold off
-                                end
-                                
-                                %analizamos la trayectoria de inicio con
-                                %todos los destinos
-                                DST(i,j)= sqrt((xi-xe)^2+(yi-ye)^2);
-                                ANG(i,j)= atan2d(yi-ye,xi-xe);
-                                
-                                %diferencia entre dos vectores
-                                %log(sqrt(sum( D_TRACK.data(1:end-3,id_ini)- D_TRACK.data(1:end-3,id_end)).^2));
-                                DFF(i,j)= corr(D_TRACK.data(1:end-3,id_ini), D_TRACK.data(1:end-3,id_end));
-                                
-                                
-                                %if (abs(ANG(i,j))<30 && DST(i,j)<5 && track(i)~=track(j))
-                                if (abs(ANG(i,j))<190 &&  DST(i,j)<20 && DFF(i,j)>factor_corr && track(i)~=track(j))
-                                    line([xi; xe],[yi; ye], 'LineWidth',2, 'Color','m'); drawnow;
-                                    PTV(i,j)= 1;
-                                    tmp = cross([xi yi 1], [xe, ye 1]);
-                                    %tmp= normal_vector([xi, yi, xe, ye])
-                                    MATRIX = MATRIX+ tmp;
-                                else
-                                    % marcamos un indice cero si la region 
-                                    % no cumple los criterios anteriores
-                                    PTV(i,j)= 0; 
-                                end
-                                
-                            else
-                                DST(i,j)=inf;
-                                ANG(i,j)=inf;
-                                DFF(i,j)=inf;
-                            end
-                            
-                        end %end j
-                      
                         
-                        %borramos los valores con distancia cero
-                        %DFF(i,find(DFF(i,:)==0))=inf;
                         
-                        %dejamos en inf los puntos que no son putativos
-                        DFF(i,find(PTV(i,:)==0))=inf; 
-                        
-                        %buscamos el mejor indice que sea tracking
-                        [val_tmp, best_id] = min(DFF(i,:));
-                      
-                        if (not(isinf(val_tmp)))
-                            PTV(i,best_id)= best_id;
-                           xe_sel = track(best_id,2);
-                           ye_sel = track(best_id,3);
-                           PAIRS = [PAIRS; i, best_id];
-                           line([xi; xe_sel],[yi; ye_sel], 'LineWidth',4, 'Color','g'); drawnow;
-                        end
-                       
-                        
-                    end
+                    end %end j
+                    
                 catch
                     fprintf('waiting for more frames... \n')
                 end
-               
+                
                 
             end
             %
             
-             if (cont==36)
-                            
-                            fprintf('Bola');
-             end
-                        
+            if (cont==36)
+                
+                fprintf('Bola');
+            end
+            
             %imrect(hAx, [xoffSet, yoffSet, size(T,2), size(T,1)]); drawnow;
             F=getframe();
             
@@ -405,68 +340,9 @@ end
 end
 
 %%
-
-function m=mrc(r,s,I,J,C)
-% Funcion de momento R+S en color
-i=I.^r;
-j=J.^s;
-m= sum(i.*j.*C);
-end
-
-
-%%
-function res=eta(r,s,I,J,C)
-% Funcion eta (necesaria para momentos de Hu)
-t= (r+s)/2 + 1;
-a=  m_central(r,s,I,J,C);
-b=  m_central(0,0,I,J,C);
-res=a/(b^t);
-end
-
-%%
-function mc= m_central(r,s,I,J,C)
-% Funcion de momento central
-m00=mrc(0,0,I,J,C);
-m10=mrc(1,0,I,J,C);
-m01=mrc(0,1,I,J,C);
-
-ci=m10/m00;
-cj=m01/m00;
-
-i= (I-ci).^r;
-j= (J-cj).^s;
-
-mc= sum(i.*j.*C);
-
-end
-%%
-function H=hu(I,J,C)
-% Funcion de momentos de Hu
-eta11=(eta(1,1,I,J,C));
-eta12=(eta(1,2,I,J,C));
-eta20=(eta(2,0,I,J,C));
-eta21=(eta(2,1,I,J,C));
-eta02=(eta(0,2,I,J,C));
-eta03=(eta(0,3,I,J,C));
-eta30=(eta(3,0,I,J,C));
-
-H(1)=eta20+eta02;
-H(2)=(eta20-eta02)^2+4*eta11^2;
-H(3)=(eta30-3*eta12)^2+(3*eta21-eta03)^2;
-H(4)=(eta30+eta12)^2+(eta21+eta03)^2;
-H(5)=(eta30-3*eta12)*(eta30+eta12)*( (eta30+eta12)^2-3*(eta21+eta03)^2)+...
-    (3*eta21-eta03)*(eta21+eta03)*(3* (eta30+eta12)^2- (eta21+eta03)^2 );
-H(6)= (eta20-eta02)*...
-    ((eta30+eta12)^2-(eta21+eta03)^2+ 4*eta11*(eta30+eta12)*(eta21+eta03));
-H(7)= (3*eta21-eta03)*(eta30+eta12)*((eta30+eta12)^2-3*(eta21+eta03)^2)+...
-    (eta30-3*eta12)*(eta21+eta03)* (3*(eta30+eta12)^2-(eta21+eta03)^2);
-end
-
-
-%%
 function [V, idx, mu]=pca(x, pct, cols)
 
-% n: filas 
+% n: filas
 % m: Características o columnas
 
 n=size(x,1);
@@ -479,21 +355,21 @@ C= 1/(n-1) * B'*B;           %2o.  Calcular la covarianza
 
 [V, D]  = eig(C);            %3o. Calcular los valores y vectores propios
 
-d       = diag(D);           %4to. Tomar los valores de la diagonal y ordernarlos 
+d       = diag(D);           %4to. Tomar los valores de la diagonal y ordernarlos
 [t, idx]= sort(d,'descend'); %     en forma descendiente
 
-e_total = sum(d);            %5to. Calcular la energia total y acumulada de los 
-                             %     valores propios
+e_total = sum(d);            %5to. Calcular la energia total y acumulada de los
+%     valores propios
 cumE= cumsum(d(idx))/e_total;
 
-sel= find(cumE<=pct);     %6to. Buscar un numero de columnas de acuerdo 
+sel= find(cumE<=pct);     %6to. Buscar un numero de columnas de acuerdo
 W= V(:,idx(1:cols));         %     al criterio de la energia
 
 KLT= B*W;                    %7mo. Terminamos. El resultados es la transformacion
-                             %     Karhunen-Loeve
+%     Karhunen-Loeve
 
 % Datos transformados con perdida
-LOSS= KLT*W'+repmat(mu,n,1); 
+LOSS= KLT*W'+repmat(mu,n,1);
 
 
 end
