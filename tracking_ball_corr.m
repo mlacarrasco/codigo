@@ -13,7 +13,7 @@
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
 % v0.10 14-08-2017   %borrado de codigo extra
 % v0.11 17-08-2017   %analisis por nandas
-% v0.12 17-08-2017   % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
+% v0.12 17-08-20  17   % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
 
 
 
@@ -64,6 +64,9 @@ window = 10;         % frames
 best_putatives=5;    % numero de bolas candidatas maximo
 draw=1;
 D_TRACK.data=[];     % almacena las regiones candidatas
+D_POLY.P =[];
+D_POLY.x =[];
+D_POLY.y =[];
 max_frames=40;        % maximo numero de regiones
 
 PAIRS=[];
@@ -137,7 +140,7 @@ while hasFrame(v)
                     
                     id_start = find(track(:,1)==cont_sel);
                     id_finish =  find(track(end,1)==track);
-
+                    
                     res= corr(D_TRACK.data(1:end-3,:));
                     poss_xy= D_TRACK.data(end-1:end,:);
                     [px, py] =find(res>factor_corr & res < 1);
@@ -153,18 +156,23 @@ while hasFrame(v)
                         delta =1;
                         SEL= mapa_distancia(poss_xy, px', py', delta);
                         
-                        hold on; plot(SEL(1,:), SEL(2,:), 'bo')
-                        
-                        %determinamos un polinomio de grado 1 para crear
-                        %una linea de proyeccion del movimiento.
-                        P=polyfit(SEL(1,:), SEL(2,:), 1)
-                        
-                        ax= axis();
-                        xa= ax(1):ax(2);
-                        yfit=P(1)*xa'+P(2);
-                        
-                        %ploteamos la linea de tendencia.
-                        hold on;plot(xa, yfit,'g-.');drawnow;
+                        if (size(SEL,2)>=2)
+                            hold on; plot(SEL(1,:), SEL(2,:), 'mx', 'markerSize',5)
+                            
+                            %determinamos un polinomio de grado 1 para crear
+                            %una linea de proyeccion del movimiento.
+                            P=polyfit(SEL(1,:), SEL(2,:), 1)
+                            
+                            ax= axis();
+                            xa= ax(1):ax(2);
+                            yfit=P(1)*xa'+P(2);
+                            
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 5);
+                            %ploteamos la linea de tendencia.
+                            plot_poly(D_POLY);
+                            
+                            %hold on;plot(xa, yfit,'g-.');drawnow;
+                        end
                     end
                     
                     
@@ -215,6 +223,17 @@ end
 
 
 %%
+function plot_poly(D)
+
+
+t= size(D.P,2);
+for i=1:t
+    xa= D.x(:,i);
+    yfit= D.y(:,i);
+    hold on;plot(xa, yfit,'g-.');drawnow;
+end
+end
+%%
 function M= add_region(M, input, cont, max_frames, center)
 
 frames =size(M.data,2);
@@ -228,6 +247,35 @@ else
     M.data(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
     M.data(:,end) = [input, cont, center];
     
+end
+
+end
+
+%%
+function M= add_poly(M, P, x, y, cont, max_frames)
+
+frames =size(M.P,2);
+
+if (frames<max_frames)
+    M.P(:,frames+1) = [P'; cont];
+    M.x(:,frames+1) = [x'];
+    M.y(:,frames+1) = [y'];
+    
+    
+    
+else
+    %agregamos una última columna al final y borramos la primera
+    tmp = repmat(M.P,1,3);
+    M.P(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
+    M.P(:,end) = [P'; cont];
+    
+    tmp = repmat(M.x,1,3);
+    M.x(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
+    M.y(:,end) = [x'];
+    
+    tmp = repmat(M.y,1,3);
+    M.x(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
+    M.y(:,end) = [y'];
     
 end
 
