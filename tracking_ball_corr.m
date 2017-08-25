@@ -12,8 +12,13 @@
 %Bloqueamos la que sean del mismo frame
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
 % v0.10 14-08-2017   %borrado de codigo extra
-% v0.11 17-08-2017   %analisis por nandas
-% v0.12 17-08-20  17   % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
+% v0.11 17-08-2017   %analisis por bandas
+% v0.12 17-08-20  17 % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
+% v0.13 18-08-20  17 % agregado la captura de vectores a una estructura
+% v0.14 24-08-20  17 % analisis de los vectores temporales
+% v0.15 25-08-20  17 % modificacion seccion de analisis de red neuronal
+
+
 
 
 
@@ -22,10 +27,21 @@ close all;
 clear all;
 warning off;
 
-ratio =0.85;    % indice de correlacion de una region
-factor=0.6;    % factor de escala del video
+
+ratio         = 0.85;   % indice de correlacion de una region
+factor        = 0.6;    % factor de escala del video
+
+radio_px      = 6;    % radio bola (red neuronal entrenada con dicho tamaño)
+factor_corr   = 0.95; % factor de correlacion entre imagenes
+window        = 10;   % frames
+best_putatives= 5;    % numero de bolas candidatas maximo
+draw          = 1;    %1: grafica
+max_frames    = 10;        % maximo numero de regiones
+
+%parametros para grabar video
 myVideo = VideoWriter('video_output/myfile_0.8.avi');
 myVideo.FrameRate=5;
+
 
 
 open(myVideo);
@@ -58,16 +74,12 @@ val=[];
 dist=[];
 track=[];
 
-radio_px=6;          % radio bola
-factor_corr = 0.95;  %factor de correlacion entre imagenes
-window = 10;         % frames
-best_putatives=5;    % numero de bolas candidatas maximo
-draw=1;
+
 D_TRACK.data=[];     % almacena las regiones candidatas
 D_POLY.P =[];
 D_POLY.x =[];
 D_POLY.y =[];
-max_frames=40;        % maximo numero de regiones
+
 
 PAIRS=[];
 while hasFrame(v)
@@ -103,19 +115,20 @@ while hasFrame(v)
             Data(cont,:) =[cont, yoffSet xoffSet];
             dist(cont)=inf;
             center= [xoffSet, yoffSet]+radio_px-1;
-            D= xy_ray(g, center, radio_px, cont, k_point, draw);
+            D= xy_ray(roi_area, center, radio_px, cont, k_point, draw);
             
             %tomamos la region y la convertimos en una columna
             %evaluamos la región con una red neuronal
             input=D(:)';%*vSted;
             outputs = net(input');
             
-            D_TRACK= add_region(D_TRACK, input, cont, max_frames, center);
-            
+          
             
             %Si output es mayor a 0.1 significa que la región es putativa
             if (outputs>0.96)
                 
+                D_TRACK= add_region(D_TRACK, input, cont, max_frames, center);
+            
                 %almacena una region candidata para un posterior analisis
                 
                 
@@ -141,7 +154,11 @@ while hasFrame(v)
                     id_start = find(track(:,1)==cont_sel);
                     id_finish =  find(track(end,1)==track);
                     
+                    %realizamos la correlacion de las caracteristicas entre
+                    %todas las regiones trackeadas
                     res= corr(D_TRACK.data(1:end-3,:));
+                    
+                    %obtenemos las coordenadas
                     poss_xy= D_TRACK.data(end-1:end,:);
                     [px, py] =find(res>factor_corr & res < 1);
                     
@@ -155,23 +172,29 @@ while hasFrame(v)
                         %distancia. (analisis de dendograma)
                         delta =1;
                         SEL= mapa_distancia(poss_xy, px', py', delta);
-                        
-                        if (size(SEL,2)>=2)
+                        thickness = size(SEL,2);
+
+                        %si obtengo más de dos puntos en correspondencias
+                        if (thickness>=3)
                             hold on; plot(SEL(1,:), SEL(2,:), 'mx', 'markerSize',5)
                             
+            
                             %determinamos un polinomio de grado 1 para crear
                             %una linea de proyeccion del movimiento.
                             P=polyfit(SEL(1,:), SEL(2,:), 1)
+                            
+                            
                             
                             ax= axis();
                             xa= ax(1):ax(2);
                             yfit=P(1)*xa'+P(2);
                             
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 5);
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, thickness, 5);
                             %ploteamos la linea de tendencia.
                             plot_poly(D_POLY);
+                            %ploteamos la última linea
                             
-                            %hold on;plot(xa, yfit,'g-.');drawnow;
+                            hold on;plot(xa, yfit,'m-.', 'lineWidth',thickness);drawnow;
                         end
                     end
                     
@@ -184,7 +207,7 @@ while hasFrame(v)
             end
             %
             
-            if (cont==36)
+            if (cont==30)
                 
                 fprintf('Bola');
             end
@@ -230,9 +253,12 @@ t= size(D.P,2);
 for i=1:t
     xa= D.x(:,i);
     yfit= D.y(:,i);
-    hold on;plot(xa, yfit,'g-.');drawnow;
+    thickness =  D.P(end-1,i); %penultimo valor es thickness
+    hold on;plot(xa, yfit,'g-.', 'linewidth',thickness);drawnow;
 end
 end
+
+
 %%
 function M= add_region(M, input, cont, max_frames, center)
 
@@ -252,31 +278,33 @@ end
 end
 
 %%
-function M= add_poly(M, P, x, y, cont, max_frames)
+function M= add_poly(M, P, x, y, cont,thickness, max_frames)
 
 frames =size(M.P,2);
 
+%calculamos angulo de la linea
+lx = x(end)-x(1);
+ly = y(1)-y(end);
+angle = atan(ly/lx)*180/pi;
+
 if (frames<max_frames)
-    M.P(:,frames+1) = [P'; cont];
-    M.x(:,frames+1) = [x'];
-    M.y(:,frames+1) = [y'];
-    
-    
-    
+    M.P(:,frames+1) = [P'; cont; thickness; angle];
+    M.x(:,frames+1) = x';
+    M.y(:,frames+1) = y';
 else
     %agregamos una última columna al final y borramos la primera
     tmp = repmat(M.P,1,3);
     M.P(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.P(:,end) = [P'; cont];
+    M.P(:,end) = [P'; cont; thickness; angle];
     
     tmp = repmat(M.x,1,3);
     M.x(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.y(:,end) = [x'];
+    M.x(:,end) = x';
     
     tmp = repmat(M.y,1,3);
-    M.x(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.y(:,end) = [y'];
-    
+    M.y(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
+    M.y(:,end) = y';
+  
 end
 
 end
