@@ -207,7 +207,7 @@ while hasFrame(v)
             end
             %
             
-            if (cont==30)
+            if (cont==123)
                 
                 fprintf('Bola');
             end
