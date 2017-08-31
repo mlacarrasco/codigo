@@ -104,7 +104,7 @@ while hasFrame(v)
     ax= axis();
     xa= ax(1):ax(2);
      %polinomio linea corte
-    PL =[ 0.77701      -88.567];
+    PL =[ 0.77701      -88.567 1];
     yfit_corte=PL(1)*xa'+PL(2);
     plot(xa, yfit_corte,'y-', 'lineWidth',1);drawnow;                      
     
@@ -188,6 +188,15 @@ while hasFrame(v)
                             %determinamos un polinomio de grado 1 para crear
                             %una linea de proyeccion del movimiento.
                             P=polyfit(SEL(1,:), SEL(2,:), 1);
+                            P= [P 1];
+                            PT= cross(PL,P); %PL polinomio recta de borde
+                            
+                            %punto de interseccion entre recta y borde
+                            %limite
+                            inter= PT./PT(2);
+                            xy_cross=[inter(1), -inter(3)];
+                           
+                            
                             yfit=P(1)*xa'+P(2);
                             
                             %agregamos el polinomio a un registro
@@ -199,6 +208,7 @@ while hasFrame(v)
                             hold on;plot(xa, yfit,'m-.', 'lineWidth',thickness);drawnow;
                            
                             plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',15)
+                            plot(xy_cross(1), xy_cross(2),'bd','markerSize',10,'LineWidth',2)
                             sw=1;
                         end
                     end
