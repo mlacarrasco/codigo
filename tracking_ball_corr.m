@@ -39,8 +39,8 @@ draw          = 1;    %1: grafica
 max_frames    = 10;        % maximo numero de regiones
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.8.avi');
-myVideo.FrameRate=5;
+myVideo = VideoWriter('video_output/myfile_0.10.avi');
+myVideo.FrameRate=10;
 
 
 
@@ -82,6 +82,7 @@ D_POLY.y =[];
 
 
 PAIRS=[];
+sw=0;
 while hasFrame(v)
     video = readFrame(v);
     g = imresize(video(:,:,2), factor);
@@ -99,9 +100,15 @@ while hasFrame(v)
     imshow(g);
     
     hold on
-    plot(perBW(:,1), perBW(:,2),'b.');
+    plot(perBW(:,1), perBW(:,2),'g.','MarkerSize',0.5);
     axis on; drawnow;
     
+    ax= axis();
+    xa= ax(1):ax(2);
+     %polinomio linea corte
+    PL =[ 0.77701      -88.567];
+    yfit_corte=PL(1)*xa'+PL(2);
+    plot(xa, yfit_corte,'y-', 'lineWidth',1);drawnow;                      
     
     if (not(isempty(id_sel)))
         %pos_list= id(id_sel);
@@ -165,36 +172,36 @@ while hasFrame(v)
                     %si no esta vacio significa que existe una relación de
                     %similitud entre un patron y otro.
                     
-                    if (not(isempty(px)))
+                    if (not(isempty(px)) && length(px)>2)
                         %El clustering primero determina la distancia entre solo
                         %los puntos que cumplen una condición de similaridad.
                         %Luego realizamos un clustering basado en similitud de
                         %distancia. (analisis de dendograma)
                         delta =1;
-                        SEL= mapa_distancia(poss_xy, px', py', delta);
-                        thickness = size(SEL,2);
+                        [SEL,thickness] =ransac_full(poss_xy, px, 0);
+                        %SEL= mapa_distancia(poss_xy, px', py',res, delta);
+                       
 
                         %si obtengo más de dos puntos en correspondencias
-                        if (thickness>=3)
-                            hold on; plot(SEL(1,:), SEL(2,:), 'mx', 'markerSize',5)
+                        if (thickness>=4)
                             
-            
+                            hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
+                            
                             %determinamos un polinomio de grado 1 para crear
                             %una linea de proyeccion del movimiento.
-                            P=polyfit(SEL(1,:), SEL(2,:), 1)
-                            
-                            
-                            
-                            ax= axis();
-                            xa= ax(1):ax(2);
+                            P=polyfit(SEL(1,:), SEL(2,:), 1);
                             yfit=P(1)*xa'+P(2);
                             
+                            %agregamos el polinomio a un registro
                             D_POLY = add_poly(D_POLY, P, xa, yfit, cont, thickness, 5);
                             %ploteamos la linea de tendencia.
-                            plot_poly(D_POLY);
+                            %plot_poly(D_POLY);
                             %ploteamos la última linea
                             
                             hold on;plot(xa, yfit,'m-.', 'lineWidth',thickness);drawnow;
+                           
+                            plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',15)
+                            sw=1;
                         end
                     end
                     
@@ -207,13 +214,14 @@ while hasFrame(v)
             end
             %
             
-            if (cont==123)
+            if (cont==140)
                 
                 fprintf('Bola');
+                break;
             end
             
             %imrect(hAx, [xoffSet, yoffSet, size(T,2), size(T,1)]); drawnow;
-            F=getframe();
+            %F=getframe();
             
             % pause
             %imshow(J,'InitialMagnification',200);
@@ -227,8 +235,17 @@ while hasFrame(v)
         
     end
     
-    %F=getframe();
-    %writeVideo(myVideo,F.cdata);
+    if (sw==0)
+        F=getframe();
+        writeVideo(myVideo,F.cdata);
+    else
+        F=getframe();
+        for i=1:40
+            writeVideo(myVideo,F.cdata);
+        end
+        sw=0;
+    end
+        
     
     if (cont>300)
         break;
@@ -289,21 +306,11 @@ angle = atan(ly/lx)*180/pi;
 
 if (frames<max_frames)
     M.P(:,frames+1) = [P'; cont; thickness; angle];
-    M.x(:,frames+1) = x';
-    M.y(:,frames+1) = y';
 else
     %agregamos una última columna al final y borramos la primera
     tmp = repmat(M.P,1,3);
     M.P(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
     M.P(:,end) = [P'; cont; thickness; angle];
-    
-    tmp = repmat(M.x,1,3);
-    M.x(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.x(:,end) = x';
-    
-    tmp = repmat(M.y,1,3);
-    M.y(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.y(:,end) = y';
   
 end
 
@@ -354,7 +361,7 @@ end
 
 if (draw)
     hold on
-    plot(xi, yi, 'b.'); drawnow;
+    plot(xi, yi, 'r.'); drawnow;
     hold off
 end
 
