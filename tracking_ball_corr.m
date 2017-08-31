@@ -13,13 +13,11 @@
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
 % v0.10 14-08-2017   %borrado de codigo extra
 % v0.11 17-08-2017   %analisis por bandas
-% v0.12 17-08-20  17 % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
-% v0.13 18-08-20  17 % agregado la captura de vectores a una estructura
-% v0.14 24-08-20  17 % analisis de los vectores temporales
-% v0.15 25-08-20  17 % modificacion seccion de analisis de red neuronal
-
-
-
+% v0.12 17-08-2017 % codigo subido a GitHub https://github.com/mlacarrasco/codigo/
+% v0.13 18-08-2017 % agregado la captura de vectores a una estructura
+% v0.14 24-08-2017 % analisis de los vectores temporales
+% v0.15 25-08-2017 % modificacion seccion de analisis de red neuronal
+% v0.16 31-08-2017 % Control de Polinomio con RANSAC de 4 puntos (minimza % el error del punto a la recta)
 
 
 function track_ball()
