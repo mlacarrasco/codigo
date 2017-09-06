@@ -2,21 +2,28 @@
 % Proyecto Elecmetal
 % Miguel A. Carrasco. (mlacarrasco@gmail.com)
 % v0.01. 30-08-2017  %buscamos una combinación con el menor error)
+% v0.02. 06-09-2017  %modificacion codigo
 
-function [SEL, thickness]=ransac_full(pts, id_sel, pant)
+function [SEL, indices, thickness]=ransac_full(pts, id_cont, id_sel, pant)
 
-SEL=[];
-pts = pts(:,id_sel);
+SEL      = [];
+best_cmb = [];
+indices  = [];
+backup= pts;
+
+%id_sel: indices de puntos correlacionados
+pts       = pts(:,id_sel);
+id_frame  = id_cont(id_sel);
 
 if (size(pts,2)>=4)
     pts = pts';
-    pts = unique(pts,'rows');
-    pts = pts';
-    nodes =size(pts,2);
+   [pts_s, ci] = unique(pts,'rows');
+    pts_s = pts_s';
+    nodes =size(pts_s,2);
     cmb =  nchoosek(1:nodes,4);
-else
-    nodes =size(pts,2);
-    cmb =  nchoosek(1:nodes,size(pts,2))
+    indices=id_frame(ci);
+    backup_ind= indices;
+    pts= pts_s;
 end
 err = zeros(size(cmb,1),1);
 
@@ -44,11 +51,18 @@ for i=1:size(cmb,1)
     
 end
 
+try
 [~, id_sort]=sort(err);
 best_cmb = cmb(id_sort(1),:)
 SEL= pts(:,best_cmb);
-
+indices = indices(best_cmb);
 thickness = size(SEL,2);
+catch
+    SEL=[];
+    best_cmb=[];
+    thickness =0;
+end
+
 end
 
 
