@@ -17,12 +17,15 @@
 % v0.13 18-08-2017 % agregado la captura de vectores a una estructura
 % v0.14 24-08-2017 % analisis de los vectores temporales
 % v0.15 25-08-2017 % modificacion seccion de analisis de red neuronal
-% v0.16 31-08-2017 % Control de Polinomio con RANSAC de 4 puntos (minimza % el error del punto a la recta)
+% v0.16 31-08-2017 % Control de Polinomio con RANSAC de 4 puntos (minimza el error del punto a la recta)
+% v0.17 31-08-2017 % analizamos la trayectoria futura de un punto..para el clasificador
+% v0.18 06-09-2017 % nueva estrategia. Generar un mapa de polinomios..
 
 
 function track_ball()
 close all;
 clear all;
+clc
 warning off;
 
 
@@ -31,13 +34,13 @@ factor        = 0.6;    % factor de escala del video
 
 radio_px      = 6;    % radio bola (red neuronal entrenada con dicho tamaño)
 factor_corr   = 0.95; % factor de correlacion entre imagenes
-window        = 10;   % frames
 best_putatives= 5;    % numero de bolas candidatas maximo
 draw          = 1;    %1: grafica
+plot_lines    = 0;
 max_frames    = 10;        % maximo numero de regiones
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.10.avi');
+myVideo = VideoWriter('video_output/myfile_0.11.avi');
 myVideo.FrameRate=10;
 
 
@@ -81,6 +84,10 @@ D_POLY.y =[];
 
 PAIRS=[];
 sw=0;
+
+
+
+
 while hasFrame(v)
     video = readFrame(v);
     g = imresize(video(:,:,2), factor);
@@ -103,10 +110,28 @@ while hasFrame(v)
     
     ax= axis();
     xa= ax(1):ax(2);
-     %polinomio linea corte
-    PL =[ 0.77701      -88.567 1];
+    
+    %polinomios
+    PL =[ 0.77701      -88.567 1]; %polinomio linea corte
+    
+    PN_UP =  [-0.14883       176.15  1]; %polinomio movimiento superior
+    PN_DOWN= [-0.40257   456.4 1]; %polinomio movimiento inferior
+    
+    POL(:,1)=linspace(PN_UP(1),PN_DOWN(1),200);
+    POL(:,2)=linspace(PN_UP(2),PN_DOWN(2),200);
+    
+    if (plot_lines)
+        for i=1:size(POL,1)
+            yfit_normal = POL(i,1)*xa'+POL(i,2);
+            plot(xa, yfit_normal,'y-', 'lineWidth',0.1);
+        end
+    end
+    
+    
     yfit_corte=PL(1)*xa'+PL(2);
-    plot(xa, yfit_corte,'y-', 'lineWidth',1);drawnow;                      
+    plot(xa, yfit_corte,'r-', 'lineWidth',0.5);
+    
+    msge= sprintf('cont:%i\n',cont);drawnow;
     
     if (not(isempty(id_sel)))
         %pos_list= id(id_sel);
@@ -127,20 +152,20 @@ while hasFrame(v)
             input=D(:)';%*vSted;
             outputs = net(input');
             
-          
+            
             
             %Si output es mayor a 0.1 significa que la región es putativa
             if (outputs>0.96)
                 
                 D_TRACK= add_region(D_TRACK, input, cont, max_frames, center);
-            
+                
                 %almacena una region candidata para un posterior analisis
                 
                 
-                fprintf('output:  %g\n',outputs);
+                %fprintf('output:  %g\n',outputs);
                 
                 %almacenamos las coordenadas de las regiones putativas
-                track= [track; cont center];
+                %track= [track; cont center];
                 %xy_ray_pintar(center, radio_px, draw);
                 
                 %revisamos los últimos xx estados
@@ -151,13 +176,13 @@ while hasFrame(v)
                 
                 
                 % seleccionamos los indices unicos del listado de tracking
-                ids = unique(track(:,1));
+                %ids = unique(track(:,1));
                 try
                     %determinamos el id del ciclo con xx cuadros antes
-                    cont_sel= ids(end- window);
+                    %cont_sel= ids(end- window);
                     
-                    id_start = find(track(:,1)==cont_sel);
-                    id_finish =  find(track(end,1)==track);
+                    %id_start = find(track(:,1)==cont_sel);
+                    %id_finish =  find(track(end,1)==track);
                     
                     %realizamos la correlacion de las caracteristicas entre
                     %todas las regiones trackeadas
@@ -165,6 +190,12 @@ while hasFrame(v)
                     
                     %obtenemos las coordenadas
                     poss_xy= D_TRACK.data(end-1:end,:);
+                    
+                    %obtenemos los indices de dichos frames
+                    id_cont = D_TRACK.data(end-2,:);
+                    
+                    %buscamos solo las coordenadas que sean
+                    %correspondientes
                     [px, py] =find(res>factor_corr & res < 1);
                     
                     %si no esta vacio significa que existe una relación de
@@ -175,40 +206,43 @@ while hasFrame(v)
                         %los puntos que cumplen una condición de similaridad.
                         %Luego realizamos un clustering basado en similitud de
                         %distancia. (analisis de dendograma)
-                        delta =1;
-                        [SEL,thickness] =ransac_full(poss_xy, px, 0);
+                        
+                        [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_cont, px,POL, 0);
                         %SEL= mapa_distancia(poss_xy, px', py',res, delta);
-                       
-
+                        
+                        
                         %si obtengo más de dos puntos en correspondencias
-                        if (thickness>=4)
+                        if (size(SEL,2)>=4)
                             
                             hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
                             
                             %determinamos un polinomio de grado 1 para crear
                             %una linea de proyeccion del movimiento.
-                            P=polyfit(SEL(1,:), SEL(2,:), 1);
-                            P= [P 1];
+                            %P=polyfit(SEL(1,:), SEL(2,:), 1);
+                            P= [POL_SEL 1];
                             PT= cross(PL,P); %PL polinomio recta de borde
                             
                             %punto de interseccion entre recta y borde
                             %limite
                             inter= PT./PT(2);
                             xy_cross=[inter(1), -inter(3)];
-                           
+                            
                             
                             yfit=P(1)*xa'+P(2);
                             
                             %agregamos el polinomio a un registro
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, thickness, 5);
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 4, 5);
                             %ploteamos la linea de tendencia.
                             %plot_poly(D_POLY);
                             %ploteamos la última linea
                             
-                            hold on;plot(xa, yfit,'m-.', 'lineWidth',thickness);drawnow;
-                           
-                            plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',15)
-                            plot(xy_cross(1), xy_cross(2),'bd','markerSize',10,'LineWidth',2)
+                            hold on;plot(xa, yfit,'m-.');drawnow;
+                            
+                            
+                            
+                            plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
+                            plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
+                            dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
                             sw=1;
                         end
                     end
@@ -222,10 +256,10 @@ while hasFrame(v)
             end
             %
             
-            if (cont==140)
+            if (cont>124)
                 
                 fprintf('Bola');
-                break;
+                %break;
             end
             
             %imrect(hAx, [xoffSet, yoffSet, size(T,2), size(T,1)]); drawnow;
@@ -238,7 +272,9 @@ while hasFrame(v)
             %imwrite(g,s);
             %end
         end%
-        fprintf('cont:%i \t val:%f\n',cont, length(values_sel));
+        
+        fprintf('%s',msge);
+        text(10,20, msge, 'FontSize',14);
         cont= cont+1;
         
     end
@@ -253,7 +289,7 @@ while hasFrame(v)
         end
         sw=0;
     end
-        
+    
     
     if (cont>300)
         break;
@@ -261,11 +297,6 @@ while hasFrame(v)
     
 end
 close(myVideo);
-figure,
-plot(Data(:,2), Data(:,3), 'b+');
-
-figure, plot(val);
-figure, plot(dist);
 
 end
 
@@ -319,7 +350,7 @@ else
     tmp = repmat(M.P,1,3);
     M.P(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
     M.P(:,end) = [P'; cont; thickness; angle];
-  
+    
 end
 
 end
