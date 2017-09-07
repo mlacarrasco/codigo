@@ -205,9 +205,11 @@ while hasFrame(v)
                             
                             plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
                             plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
-                            predicted_frame = dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
+                            
+                            %prediccion del frame
+                            pred_frame = dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
                              %agregamos el polinomio a un registro
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 4, 5);
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont,pred_frame, 5);
                             
                             
                             sw=1;
@@ -300,27 +302,6 @@ end
 
 end
 
-%%
-function M= add_poly(M, P, x, y, cont,thickness, max_frames)
-
-frames =size(M.P,2);
-
-%calculamos angulo de la linea
-lx = x(end)-x(1);
-ly = y(1)-y(end);
-angle = atan(ly/lx)*180/pi;
-
-if (frames<max_frames)
-    M.P(:,frames+1) = [P'; cont; thickness; angle];
-else
-    %agregamos una última columna al final y borramos la primera
-    tmp = repmat(M.P,1,3);
-    M.P(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.P(:,end) = [P'; cont; thickness; angle];
-    
-end
-
-end
 
 %%
 function D= xy_ray_pintar(center, radio_px, draw)
