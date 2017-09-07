@@ -2,6 +2,8 @@
 % Miguel A. Carrasco. (mlacarrasco@gmail.com)
 % Distancia entre un punto y un vector
 % v0.01. 01-09-2017  
+% v0.02. 07-09-2017  %alicamos un modelo de regresion
+
 
 function regress_frame = dist_pts(point, V, id_frames, now, x,y, radio)
 
@@ -17,10 +19,15 @@ angle = atan(ly/lx)*180/pi;
 distance = sqrt(sum((P-V).^2))+radio*2;
 time     = abs(id_frames-now)+1;
 
-%velocidad de pixeles por frame
-vel = mean(distance./time);
+x=[ones(size(distance,2),1), distance']
+y = id_frames';
 
-next_frame = ceil(min(distance)/vel);
+xfit= 0:1:max(x(:,2))
+model =regress (y,x);
+yfit = model(1) + model(2)*xfit
 
-regress_frame =  max(id_frames)+next_frame;
+%figure, plot(y(:), x(:,2)); hold on
+%plot(yfit, xfit)
+
+regress_frame =model(1);
 end

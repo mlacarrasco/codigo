@@ -4,7 +4,7 @@
 % v0.01. 30-08-2017  %buscamos una combinación con el menor error)
 % v0.02. 06-09-2017  %busqueda de polinomio que intersecta
 
-function [SEL, indices,POL_SEL]=ransac_full(pts, id_cont, id_sel, POL, pant)
+function [SEL, indices,POL_SEL,POL_err]=ransac_full(pts, id_cont, id_sel, POL, pant)
 
 SEL      = [];
 best_cmb = [];
@@ -53,9 +53,11 @@ for i=1:size(cmb,1)
         tmp = [tmp; val id];
         
     end
-    s= sum(tmp,1);
+    
+    %para cada grupo, seleccionamos la mejor recta.
+    s= mean(tmp,1);
     err(i) = s(1);
-    pol_s(i) = mode(tmp(:,2));
+    pol_s(i) = ceil(median(tmp(:,2)));
     
     
 %     %ploteamos una recta que intersecta los puntos agrupados en el
@@ -77,12 +79,12 @@ for i=1:size(cmb,1)
 end
 
 try
-[~, id_sort]=sort(err);
-best_cmb = cmb(id_sort(1),:)
-SEL= pts(:,best_cmb);
-indices = indices(best_cmb);
-thickness = size(SEL,2);
-POL_SEL = POL(pol_s(id_sort(1)),:);
+  [~, id_sort]=sort(err);
+  best_cmb = cmb(id_sort(1),:)
+  SEL= pts(:,best_cmb);
+  indices = indices(best_cmb);
+  POL_err= err(id_sort);
+  POL_SEL = POL(pol_s(id_sort(1)),:);
 catch
     SEL=[];
     best_cmb=[];

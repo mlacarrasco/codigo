@@ -8,8 +8,7 @@
 % v0.05. 14-06-2017  %tracking de vectores por ángulo y distancia
 % v0.06. 23-06-2017  %tracking en una zona y classificación en otra
 % v0.07. 30-06-2017  %guardamos las regiones del tracking
-% v0.08 10-07-2017   %analizamos las trayectorias de un mismo punto.
-%Bloqueamos la que sean del mismo frame
+% v0.08 10-07-2017   %analizamos las trayectorias de un mismo punto. Bloqueamos la que sean del mismo frame
 % v0.09 14-07-2017   %empleamos la correlación entre dos señales para buscar similitud
 % v0.10 14-08-2017   %borrado de codigo extra
 % v0.11 17-08-2017   %analisis por bandas
@@ -19,7 +18,7 @@
 % v0.15 25-08-2017 % modificacion seccion de analisis de red neuronal
 % v0.16 31-08-2017 % Control de Polinomio con RANSAC de 4 puntos (minimza el error del punto a la recta)
 % v0.17 31-08-2017 % analizamos la trayectoria futura de un punto..para el clasificador
-% v0.18 06-09-2017 % nueva estrategia. Generar un mapa de polinomios..
+% v0.18 06-09-2017 % Interseccion con familiaa de polinomios
 
 
 function track_ball()
@@ -40,7 +39,7 @@ plot_lines    = 0;
 max_frames    = 10;        % maximo numero de regiones
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.11.avi');
+myVideo = VideoWriter('video_output/myfile_0.12.avi');
 myVideo.FrameRate=10;
 
 
@@ -142,8 +141,8 @@ while hasFrame(v)
             [ypeak, xpeak] = find(c==values_sel(k_point));
             yoffSet = ypeak-size(T,1);
             xoffSet = xpeak-size(T,2);
-            Data(cont,:) =[cont, yoffSet xoffSet];
-            dist(cont)=inf;
+            %Data(cont,:) =[cont, yoffSet xoffSet];
+            %dist(cont)=inf;
             center= [xoffSet, yoffSet]+radio_px-1;
             D= xy_ray(roi_area, center, radio_px, cont, k_point, draw);
             
@@ -153,72 +152,37 @@ while hasFrame(v)
             outputs = net(input');
             
             
-            
             %Si output es mayor a 0.1 significa que la región es putativa
             if (outputs>0.96)
                 
                 D_TRACK= add_region(D_TRACK, input, cont, max_frames, center);
                 
-                %almacena una region candidata para un posterior analisis
-                
-                
-                %fprintf('output:  %g\n',outputs);
-                
-                %almacenamos las coordenadas de las regiones putativas
-                %track= [track; cont center];
-                %xy_ray_pintar(center, radio_px, draw);
-                
-                %revisamos los últimos xx estados
-                %determino los ciclos que son únicos
-                
-                %[WARNING]: esto habría que mejorar.
-                %            Potencial riego de limite de memoria
-                
-                
-                % seleccionamos los indices unicos del listado de tracking
-                %ids = unique(track(:,1));
                 try
-                    %determinamos el id del ciclo con xx cuadros antes
-                    %cont_sel= ids(end- window);
                     
-                    %id_start = find(track(:,1)==cont_sel);
-                    %id_finish =  find(track(end,1)==track);
-                    
-                    %realizamos la correlacion de las caracteristicas entre
-                    %todas las regiones trackeadas
                     res= corr(D_TRACK.data(1:end-3,:));
                     
                     %obtenemos las coordenadas
                     poss_xy= D_TRACK.data(end-1:end,:);
-                    
                     %obtenemos los indices de dichos frames
                     id_cont = D_TRACK.data(end-2,:);
                     
-                    %buscamos solo las coordenadas que sean
-                    %correspondientes
-                    [px, py] =find(res>factor_corr & res < 1);
+                    %buscamos solo las coordenadas que sean correspondientes
+                    [px,~ ] =find(res>factor_corr & res < 1);
                     
                     %si no esta vacio significa que existe una relación de
                     %similitud entre un patron y otro.
                     
                     if (not(isempty(px)) && length(px)>2)
-                        %El clustering primero determina la distancia entre solo
-                        %los puntos que cumplen una condición de similaridad.
-                        %Luego realizamos un clustering basado en similitud de
-                        %distancia. (analisis de dendograma)
                         
+                        %analizamos las combinaciones de puntos
                         [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_cont, px,POL, 0);
-                        %SEL= mapa_distancia(poss_xy, px', py',res, delta);
-                        
                         
                         %si obtengo más de dos puntos en correspondencias
                         if (size(SEL,2)>=4)
                             
                             hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
                             
-                            %determinamos un polinomio de grado 1 para crear
-                            %una linea de proyeccion del movimiento.
-                            %P=polyfit(SEL(1,:), SEL(2,:), 1);
+                            %seleccionamos el polinimio optimo
                             P= [POL_SEL 1];
                             PT= cross(PL,P); %PL polinomio recta de borde
                             
@@ -230,8 +194,7 @@ while hasFrame(v)
                             
                             yfit=P(1)*xa'+P(2);
                             
-                            %agregamos el polinomio a un registro
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 4, 5);
+                           
                             %ploteamos la linea de tendencia.
                             %plot_poly(D_POLY);
                             %ploteamos la última linea
@@ -242,7 +205,11 @@ while hasFrame(v)
                             
                             plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
                             plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
-                            dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
+                            predicted_frame = dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
+                             %agregamos el polinomio a un registro
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont, 4, 5);
+                            
+                            
                             sw=1;
                         end
                     end
@@ -432,37 +399,4 @@ end
 %shading interp;
 end
 
-%%
-function [V, idx, mu]=pca(x, pct, cols)
 
-% n: filas
-% m: Características o columnas
-
-n=size(x,1);
-m=size(x,1);
-
-mu=mean(x,1);                %0o. Calcular la media por columnas
-
-B= x-repmat(mu,n,1);         %1o.  Restar la media
-C= 1/(n-1) * B'*B;           %2o.  Calcular la covarianza
-
-[V, D]  = eig(C);            %3o. Calcular los valores y vectores propios
-
-d       = diag(D);           %4to. Tomar los valores de la diagonal y ordernarlos
-[t, idx]= sort(d,'descend'); %     en forma descendiente
-
-e_total = sum(d);            %5to. Calcular la energia total y acumulada de los
-%     valores propios
-cumE= cumsum(d(idx))/e_total;
-
-sel= find(cumE<=pct);     %6to. Buscar un numero de columnas de acuerdo
-W= V(:,idx(1:cols));         %     al criterio de la energia
-
-KLT= B*W;                    %7mo. Terminamos. El resultados es la transformacion
-%     Karhunen-Loeve
-
-% Datos transformados con perdida
-LOSS= KLT*W'+repmat(mu,n,1);
-
-
-end
