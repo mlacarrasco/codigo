@@ -19,15 +19,16 @@ angle = atan(ly/lx)*180/pi;
 distance = sqrt(sum((P-V).^2))+radio*2;
 time     = abs(id_frames-now)+1;
 
-x=[ones(size(distance,2),1), distance']
+x=[ones(size(distance,2),1), distance'];
 y = id_frames';
 
-xfit= 0:1:max(x(:,2))
+xfit= 0:1:max(x(:,2));
 model =regress (y,x);
-yfit = model(1) + model(2)*xfit
+yfit = model(1) + model(2)*xfit;
 
 %figure, plot(y(:), x(:,2)); hold on
 %plot(yfit, xfit)
 
-regress_frame =model(1);
+%frame de posicion proyectada
+regress_frame =ceil(model(1));
 end
