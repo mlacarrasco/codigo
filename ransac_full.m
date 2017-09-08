@@ -2,7 +2,7 @@
 % Proyecto Elecmetal
 % Miguel A. Carrasco. (mlacarrasco@gmail.com)
 % v0.01. 30-08-2017  %buscamos una combinación con el menor error)
-% v0.02. 06-09-2017  %busqueda de polinomio que intersecta
+% v0.02. 06-09-2017  %busqueda de polinomio que intersecta a cada punto.
 
 function [SEL, indices,POL_SEL,POL_err]=ransac_full(pts, id_cont, id_sel, POL, pant)
 
@@ -67,14 +67,7 @@ for i=1:size(cmb,1)
 %         hold on;plot(xa, yfit,'y-.');drawnow;
 %     end
 %     
-%     distance = zeros(size(pts,2),1);
-%     for p=1:size(pts,2)
-%         %calculamos la distancia de un punto a la recta (polinomio)
-%         %forma del polinomio y= -a/b*x - c/b;
-%         distance(p) = (abs(-P(1)*pts(1,p) + 1*pts(2,p) - P(3))) / (sqrt(P(1)^2 + P(2)^2));
-%         %plot(SEL(1,p),SEL(2,p),'ys','MarkerSize',10);
-%     end
-%     err(i) = mean(distance);
+
     
 end
 
