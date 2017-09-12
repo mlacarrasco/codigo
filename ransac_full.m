@@ -73,7 +73,7 @@ end
 
 try
   [~, id_sort]=sort(err);
-  best_cmb = cmb(id_sort(1),:)
+  best_cmb = cmb(id_sort(1),:);
   SEL= pts(:,best_cmb);
   indices = indices(best_cmb);
   POL_err= err(id_sort);

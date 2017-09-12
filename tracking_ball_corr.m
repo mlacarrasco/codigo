@@ -16,9 +16,10 @@
 % v0.13 18-08-2017 % agregado la captura de vectores a una estructura
 % v0.14 24-08-2017 % analisis de los vectores temporales
 % v0.15 25-08-2017 % modificacion seccion de analisis de red neuronal
-% v0.16 31-08-2017 % Control de Polinomio con RANSAC de 4 puntos (minimza el error del punto a la recta)
+% v0.16 31-08-2017 % frame_idrol de Polinomio con RANSAC de 4 puntos (minimza el error del punto a la recta)
 % v0.17 31-08-2017 % analizamos la trayectoria futura de un punto..para el clasificador
-% v0.18 06-09-2017 % Interseccion con familiaa de polinomios
+% v0.18 06-09-2017 % Interseccion con familia de polinomios
+% v0.19 08-09-2017 % Buscamos en la posición proyectada
 
 
 function track_ball()
@@ -37,16 +38,13 @@ best_putatives= 5;    % numero de bolas candidatas maximo
 draw          = 1;    %1: grafica
 plot_lines    = 0;
 max_frames    = 10;        % maximo numero de regiones
+max_lines     = 200;  %máximo numero de lineas que cubre la zona
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.12.avi');
+myVideo = VideoWriter('video_output/myfile_0.14.avi');
 myVideo.FrameRate=10;
-
-
-
 open(myVideo);
 v= VideoReader('video_input/section_2.mov');
-
 %%cargamos el archivo con el modelo de red neuroal
 if exist('mat_files/net.mat')
     load('mat_files/net.mat');    %carga el modelo de red neuronal
@@ -55,7 +53,7 @@ end
 
 
 T = imread('templates/template_2.png');
-T = imresize(T,factor);
+TR = imresize(T,factor);
 BW= imresize(imread('templates/roi_area_detection_1280_banda.tif'),factor);
 
 BW=BW>0;
@@ -67,58 +65,40 @@ for i=1:size(tmp,1)
     perBW= [perBW; tmp(i).PixelList];
 end
 
-cont=1;
-
-Data=[];
-val=[];
-dist=[];
-track=[];
-
+frame_id=1;
 
 D_TRACK.data=[];     % almacena las regiones candidatas
 D_POLY.P =[];
-D_POLY.x =[];
-D_POLY.y =[];
 
-
-PAIRS=[];
 sw=0;
 
-
+%POLINOMIOS
+PL =[ 0.77701      -88.567 1]; %polinomio linea corte
+PN_UP =  [-0.14883  176.15  1]; %polinomio movimiento superior
+PN_DOWN= [-0.40257   456.4 1]; %polinomio movimiento inferior
+POL(:,1)=linspace(PN_UP(1),PN_DOWN(1),max_lines);
+POL(:,2)=linspace(PN_UP(2),PN_DOWN(2),max_lines);
 
 
 while hasFrame(v)
     video = readFrame(v);
-    g = imresize(video(:,:,2), factor);
-    roi_area= uint8(BW).*g;
+    g= video(:,:,2);
+    gr = imresize(g, factor);
+    roi_area= uint8(BW).*gr;
     %roi_area = g;
-    
-    
-    c= normxcorr2(T, roi_area);
-    %%obtenemos un set de candidatos..
-    %%los ordenamos de mayor a menor
-    [values id] = sort(c(:), 'descend');
-    id_sel= find(values(1:best_putatives)> ratio);
-    
-    
-    imshow(g);
-    
-    hold on
-    plot(perBW(:,1), perBW(:,2),'g.','MarkerSize',0.5);
+
+    msge= sprintf('frame id: %i\n',frame_id);
+    imshow(gr);  hold on
+    plot(perBW(:,1), perBW(:,2),'g.','MarkerSize',0.5); 
+    text(size(gr,2)-90,size(gr,1)-10, msge, 'FontSize',14,'Color','green');
     axis on; drawnow;
     
-    ax= axis();
-    xa= ax(1):ax(2);
+    ax= axis();xa= ax(1):ax(2);
+    yfit_corte=PL(1)*xa'+PL(2);
+    plot(xa, yfit_corte,'r-', 'lineWidth',0.5);drawnow;
+  
     
-    %polinomios
-    PL =[ 0.77701      -88.567 1]; %polinomio linea corte
-    
-    PN_UP =  [-0.14883       176.15  1]; %polinomio movimiento superior
-    PN_DOWN= [-0.40257   456.4 1]; %polinomio movimiento inferior
-    
-    POL(:,1)=linspace(PN_UP(1),PN_DOWN(1),200);
-    POL(:,2)=linspace(PN_UP(2),PN_DOWN(2),200);
-    
+    %>>despliega las lineas por pantalla.
     if (plot_lines)
         for i=1:size(POL,1)
             yfit_normal = POL(i,1)*xa'+POL(i,2);
@@ -127,13 +107,19 @@ while hasFrame(v)
     end
     
     
-    yfit_corte=PL(1)*xa'+PL(2);
-    plot(xa, yfit_corte,'r-', 'lineWidth',0.5);
+    %>>>> TEMPLATE-MATCHING
+    c= normxcorr2(TR, roi_area);
     
-    msge= sprintf('cont:%i\n',cont);drawnow;
-    
+    %>> obtenemos un set de candidatos..
+    %   los ordenamos de mayor a menor
+    [values id] = sort(c(:), 'descend');
+    id_sel= find(values(1:best_putatives)> ratio);
+   
+    %>>> SEARCH PUTATIVE 
+    class = search_putative(D_POLY, frame_id, g, factor, PL, T);
+    %>> analizamos si se encuentran regiones de interés
     if (not(isempty(id_sel)))
-        %pos_list= id(id_sel);
+        
         values_sel = values(id_sel);
         
         for k_point=1:length(id_sel)
@@ -141,77 +127,67 @@ while hasFrame(v)
             [ypeak, xpeak] = find(c==values_sel(k_point));
             yoffSet = ypeak-size(T,1);
             xoffSet = xpeak-size(T,2);
-            %Data(cont,:) =[cont, yoffSet xoffSet];
-            %dist(cont)=inf;
-            center= [xoffSet, yoffSet]+radio_px-1;
-            D= xy_ray(roi_area, center, radio_px, cont, k_point, draw);
             
-            %tomamos la region y la convertimos en una columna
-            %evaluamos la región con una red neuronal
+            center= [xoffSet, yoffSet]+radio_px-1;
+            D= xy_ray(roi_area, center, radio_px, frame_id, k_point, draw);
+            
+            
+            %%>> RED NEURONAL
+            %    tomamos la region y la convertimos en una columna
+            %    evaluamos la región con una RED NEURONAL
             input=D(:)';%*vSted;
             outputs = net(input');
-            
             
             %Si output es mayor a 0.1 significa que la región es putativa
             if (outputs>0.96)
                 
-                D_TRACK= add_region(D_TRACK, input, cont, max_frames, center);
+                %>> incoramos esta info a la estructura temporal
+                D_TRACK= add_region(D_TRACK, input, frame_id, max_frames, center);
                 
                 try
                     
                     res= corr(D_TRACK.data(1:end-3,:));
                     
-                    %obtenemos las coordenadas
+                    %>> obtenemos las coordenadas
                     poss_xy= D_TRACK.data(end-1:end,:);
-                    %obtenemos los indices de dichos frames
-                    id_cont = D_TRACK.data(end-2,:);
+                    %>> obtenemos los indices de dichos frames
+                    id_frame_id = D_TRACK.data(end-2,:);
                     
-                    %buscamos solo las coordenadas que sean correspondientes
+                    %>> buscamos solo las coordenadas que sean correspondientes
                     [px,~ ] =find(res>factor_corr & res < 1);
                     
-                    %si no esta vacio significa que existe una relación de
-                    %similitud entre un patron y otro.
+                    %>> si no esta vacio significa que existe una relación de
+                    %   similitud entre un patron y otro.
                     
                     if (not(isempty(px)) && length(px)>2)
                         
-                        %analizamos las combinaciones de puntos
-                        [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_cont, px,POL, 0);
+                        %>> analizamos las combinaciones de puntos
+                        [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_frame_id, px,POL, 0);
                         
-                        %si obtengo más de dos puntos en correspondencias
+                        %>> si obtengo más de dos puntos en correspondencias
                         if (size(SEL,2)>=4)
                             
                             hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
                             
-                            %seleccionamos el polinimio optimo
+                            %>> INTERSECCION
+                            %seleccionamos el polinomio
                             P= [POL_SEL 1];
                             PT= cross(PL,P); %PL polinomio recta de borde
-                            
-                            %punto de interseccion entre recta y borde
-                            %limite
-                            inter= PT./PT(2);
+                            inter= PT./PT(2); %punto de interseccion entre recta
                             xy_cross=[inter(1), -inter(3)];
                             
                             
+                            %>> ploteamos la linea de tendencia.
                             yfit=P(1)*xa'+P(2);
-                            
-                           
-                            %ploteamos la linea de tendencia.
-                            %plot_poly(D_POLY);
-                            %ploteamos la última linea
-                            
                             hold on;plot(xa, yfit,'m-.');drawnow;
-                            
-                            
-                            
                             plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
                             plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
                             
-                            %prediccion del frame
-                            pred_frame = dist_pts(xy_cross',SEL,id_frames, cont , xa, yfit, radio_px)
-                             %agregamos el polinomio a un registro
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, cont,pred_frame, 5);
+                            %>> prediccion del frame
+                            pred_frame = dist_pts(xy_cross',SEL,id_frames, frame_id , xa, yfit, radio_px)
                             
-                            
+                            %>> agregamos el polinomio a un registro
+                            D_POLY = add_poly(D_POLY, P, xa, yfit, frame_id, pred_frame, xy_cross, max_frames);
                             sw=1;
                         end
                     end
@@ -220,15 +196,12 @@ while hasFrame(v)
                 catch
                     fprintf('waiting for more frames... \n')
                 end
-                
-                
-            end
+            end %fin output
             %
             
-            if (cont>124)
+            if (frame_id>124)
                 
-                fprintf('Bola');
-                %break;
+                break;
             end
             
             %imrect(hAx, [xoffSet, yoffSet, size(T,2), size(T,1)]); drawnow;
@@ -237,14 +210,14 @@ while hasFrame(v)
             % pause
             %imshow(J,'InitialMagnification',200);
             
-            %s=sprintf('data/data_move_%i.png',cont);
+            %s=sprintf('data/data_move_%i.png',frame_id);
             %imwrite(g,s);
             %end
         end%
         
         fprintf('%s',msge);
-        text(10,20, msge, 'FontSize',14);
-        cont= cont+1;
+     
+        frame_id= frame_id+1;
         
     end
     
@@ -260,7 +233,7 @@ while hasFrame(v)
     end
     
     
-    if (cont>300)
+    if (frame_id>300)
         break;
     end
     
@@ -270,33 +243,21 @@ close(myVideo);
 end
 
 
-%%
-function plot_poly(D)
 
 
-t= size(D.P,2);
-for i=1:t
-    xa= D.x(:,i);
-    yfit= D.y(:,i);
-    thickness =  D.P(end-1,i); %penultimo valor es thickness
-    hold on;plot(xa, yfit,'g-.', 'linewidth',thickness);drawnow;
-end
-end
-
-
-%%
-function M= add_region(M, input, cont, max_frames, center)
+%% >>> FUNCIONES >>
+function M= add_region(M, input, frame_id, max_frames, center)
 
 frames =size(M.data,2);
 
 if (frames<max_frames)
-    M.data(:,frames+1) = [input, cont, center];
+    M.data(:,frames+1) = [input, frame_id, center];
     
 else
     %agregamos una última columna al final y borramos la primera
     tmp = repmat(M.data,1,3);
     M.data(:,1:end-1)= tmp(:,frames+2:frames+max_frames);
-    M.data(:,end) = [input, cont, center];
+    M.data(:,end) = [input, frame_id, center];
     
 end
 
@@ -325,7 +286,7 @@ end
 end
 
 %%
-function D= xy_ray(ima, center, radio_px, cont, k, draw)
+function D= xy_ray(ima, center, radio_px, frame_id, k, draw)
 
 angle=0:1:359;
 radian=deg2rad(angle);
@@ -353,7 +314,7 @@ if (draw)
 end
 
 sw=0;
-if (cont>350 && sw)
+if (frame_id>350 && sw)
     % Construct a questdlg with three options
     choice = questdlg('Es bola?', ...
         'Opciones', ...
@@ -372,7 +333,7 @@ if (cont>350 && sw)
     end
     %dat = [HA, option];
     
-    s=sprintf('data/region_move_%i_%i.mat',cont,k);
+    s=sprintf('data/region_move_%i_%i.mat',frame_id,k);
     save(s,'D', 'dat');
 end
 %imwrite(uint8(D),s);
