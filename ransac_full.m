@@ -11,29 +11,37 @@ best_cmb = [];
 indices  = [];
 backup   = pts;
 POL_SEL  = [];
+no_combs = 5;
 
 %id_sel: indices de puntos correlacionados
 pts       = pts(:,id_sel);
 id_frame  = id_cont(id_sel);
 
-if (size(pts,2)>=4)
+if (size(pts,2)>=no_combs)
     pts = pts';
-   [pts_s, ci] = unique(pts,'rows');
+    [pts_s, ci] = unique(pts,'rows');
     pts_s = pts_s';
     nodes =size(pts_s,2);
-    cmb =  nchoosek(1:nodes,4);
+    cmb =  nchoosek(1:nodes,no_combs);
     indices=id_frame(ci);
     backup_ind= indices;
     pts= pts_s;
 end
-err   = zeros(size(cmb,1),1);
-pol_s = zeros(size(cmb,1),1);
+
+try
+    err   = zeros(size(cmb,1),1);
+    pol_s = zeros(size(cmb,1),1);
+catch
+    err=[];
+    pol_s=[];
+    cmb=[];
+end
 
 for i=1:size(cmb,1)
     
     cols= cmb(i,:);
     %coordenadas seleccionadas (combinatorial)
-    SEL = pts(:, cols); 
+    SEL = pts(:, cols);
     
     %P= [polyfit(SEL(1,:), SEL(2,:), 1) 1];
     tmp=[];
@@ -60,24 +68,24 @@ for i=1:size(cmb,1)
     pol_s(i) = ceil(median(tmp(:,2)));
     
     
-%     %ploteamos una recta que intersecta los puntos agrupados en el
-%     %subcluster.
-%     if (pant)
-%         ax= axis(); xa= ax(1):ax(2); yfit=P(1)*xa'+P(2);
-%         hold on;plot(xa, yfit,'y-.');drawnow;
-%     end
-%     
-
+    %     %ploteamos una recta que intersecta los puntos agrupados en el
+    %     %subcluster.
+    %     if (pant)
+    %         ax= axis(); xa= ax(1):ax(2); yfit=P(1)*xa'+P(2);
+    %         hold on;plot(xa, yfit,'y-.');drawnow;
+    %     end
+    %
+    
     
 end
 
 try
-  [~, id_sort]=sort(err);
-  best_cmb = cmb(id_sort(1),:);
-  SEL= pts(:,best_cmb);
-  indices = indices(best_cmb);
-  POL_err= err(id_sort);
-  POL_SEL = POL(pol_s(id_sort(1)),:);
+    [~, id_sort]=sort(err);
+    best_cmb = cmb(id_sort(1),:);
+    SEL= pts(:,best_cmb);
+    indices = indices(best_cmb);
+    POL_err= err(id_sort);
+    POL_SEL = POL(pol_s(id_sort(1)),:);
 catch
     SEL=[];
     best_cmb=[];

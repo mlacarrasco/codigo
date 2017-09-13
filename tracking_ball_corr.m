@@ -20,7 +20,7 @@
 % v0.17 31-08-2017 % analizamos la trayectoria futura de un punto..para el clasificador
 % v0.18 06-09-2017 % Interseccion con familia de polinomios
 % v0.19 08-09-2017 % Buscamos en la posición proyectada
-% v0.20 13-09-2017 % Buscamos en la posición proyectada
+% v0.20 13-09-2017 % Analisis de clasificación
 
 
 function track_ball()
