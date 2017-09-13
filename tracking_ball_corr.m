@@ -42,7 +42,7 @@ max_frames    = 10;        % maximo numero de regiones
 max_lines     = 200;  %máximo numero de lineas que cubre la zona
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.15.mp4', 'MPEG-4');
+myVideo = VideoWriter('video_output/myfile_0.16.mp4', 'MPEG-4');
 myVideo.FrameRate=10;
 open(myVideo);
 v= VideoReader('video_input/section_2.mov');
@@ -117,8 +117,8 @@ while hasFrame(v)
     [values id] = sort(c(:), 'descend');
     id_sel= find(values(1:best_putatives)> ratio);
     
-    %>>> SEARCH PUTATIVE
-    [output_class sw_class] = search_putative(D_POLY, frame_id, gr, factor, PL, T);
+    %>>> SEARCH PUTATIVE OBJECT
+    [output_class sw_class] = search_putative(T,D_TRACK, D_POLY, frame_id, gr, factor, PL, T);
     
     %--> Buscamos si existen regiones clasificadas como objetos
     if (sw_class)
@@ -135,7 +135,7 @@ while hasFrame(v)
         end
     end
     
-    
+    msge_pred=[];
     %>> analizamos si se encuentran regiones de interés
     if (not(isempty(id_sel)))
         
@@ -203,12 +203,15 @@ while hasFrame(v)
                         plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
                         
                         %>> prediccion del frame
-                        pred_frame = dist_pts(xy_cross',SEL,id_frames, frame_id , xa, yfit, radio_px)
+                        pred_frame = dist_pts(xy_cross',SEL,id_frames, frame_id , xa, yfit, radio_px);
                         
                         %>> agregamos el polinomio a un registro
+                         msge_pred= sprintf('pred frame: %i\n',pred_frame);
+                          text(size(gr,2)-110,size(gr,1)-25, msge_pred, 'FontSize',14,'Color','green');drawnow;
                         D_POLY = add_poly(D_POLY, P, xa, yfit, frame_id, pred_frame, xy_cross, max_frames);
                         sw=1;
                     end
+                   
                 end
                 
                 
