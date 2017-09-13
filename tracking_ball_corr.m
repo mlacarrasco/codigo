@@ -20,6 +20,7 @@
 % v0.17 31-08-2017 % analizamos la trayectoria futura de un punto..para el clasificador
 % v0.18 06-09-2017 % Interseccion con familia de polinomios
 % v0.19 08-09-2017 % Buscamos en la posición proyectada
+% v0.20 13-09-2017 % Buscamos en la posición proyectada
 
 
 function track_ball()
@@ -41,19 +42,19 @@ max_frames    = 10;        % maximo numero de regiones
 max_lines     = 200;  %máximo numero de lineas que cubre la zona
 
 %parametros para grabar video
-myVideo = VideoWriter('video_output/myfile_0.14.avi');
+myVideo = VideoWriter('video_output/myfile_0.15.mp4', 'MPEG-4');
 myVideo.FrameRate=10;
 open(myVideo);
 v= VideoReader('video_input/section_2.mov');
 %%cargamos el archivo con el modelo de red neuroal
 if exist('mat_files/net.mat')
     load('mat_files/net.mat');    %carga el modelo de red neuronal
-    load('mat_files/vSted.mat');  %carga los vectores propios de PCA
+    %load('mat_files/vSted.mat');  %carga los vectores propios de PCA
 end
 
 
-T = imread('templates/template_2.png');
-TR = imresize(T,factor);
+TO = imread('templates/template_2.png');
+T = imresize(TO,factor);
 BW= imresize(imread('templates/roi_area_detection_1280_banda.tif'),factor);
 
 BW=BW>0;
@@ -84,19 +85,19 @@ while hasFrame(v)
     video = readFrame(v);
     g= video(:,:,2);
     gr = imresize(g, factor);
-    roi_area= uint8(BW).*gr;
+    %roi_area= uint8(BW).*gr;
     %roi_area = g;
-
+    
     msge= sprintf('frame id: %i\n',frame_id);
     imshow(gr);  hold on
-    plot(perBW(:,1), perBW(:,2),'g.','MarkerSize',0.5); 
+    plot(perBW(:,1), perBW(:,2),'g.','MarkerSize',0.5);
     text(size(gr,2)-90,size(gr,1)-10, msge, 'FontSize',14,'Color','green');
     axis on; drawnow;
     
     ax= axis();xa= ax(1):ax(2);
     yfit_corte=PL(1)*xa'+PL(2);
     plot(xa, yfit_corte,'r-', 'lineWidth',0.5);drawnow;
-  
+    
     
     %>>despliega las lineas por pantalla.
     if (plot_lines)
@@ -108,15 +109,33 @@ while hasFrame(v)
     
     
     %>>>> TEMPLATE-MATCHING
-    c= normxcorr2(TR, roi_area);
-    
+    c= normxcorr2(T, gr);
+    c= imresize(BW,size(c)).*c;
+    roi_area=gr;
     %>> obtenemos un set de candidatos..
     %   los ordenamos de mayor a menor
     [values id] = sort(c(:), 'descend');
     id_sel= find(values(1:best_putatives)> ratio);
-   
-    %>>> SEARCH PUTATIVE 
-    class = search_putative(D_POLY, frame_id, g, factor, PL, T);
+    
+    %>>> SEARCH PUTATIVE
+    [output_class sw_class] = search_putative(D_POLY, frame_id, gr, factor, PL, T);
+    
+    %--> Buscamos si existen regiones clasificadas como objetos
+    if (sw_class)
+        id_class = find(output_class.class>0.96);
+        if (not(isempty(id_class)))
+            for p=id_class
+               xx= output_class.poss(p,1);
+               yy= output_class.poss(p,2);
+               text(xx-10,yy-50,'Object Detected','FontSize',16,'Color','green');
+               plot(xx,yy , 'bs', 'LineWidth',5);
+                 sw=1;
+                
+            end
+        end
+    end
+    
+    
     %>> analizamos si se encuentran regiones de interés
     if (not(isempty(id_sel)))
         
@@ -144,58 +163,58 @@ while hasFrame(v)
                 %>> incoramos esta info a la estructura temporal
                 D_TRACK= add_region(D_TRACK, input, frame_id, max_frames, center);
                 
-                try
+                %try
+                
+                res= corr(D_TRACK.data(1:end-3,:));
+                
+                %>> obtenemos las coordenadas
+                poss_xy= D_TRACK.data(end-1:end,:);
+                %>> obtenemos los indices de dichos frames
+                id_frame_id = D_TRACK.data(end-2,:);
+                
+                %>> buscamos solo las coordenadas que sean correspondientes
+                [px,~ ] =find(res>factor_corr & res < 1);
+                
+                %>> si no esta vacio significa que existe una relación de
+                %   similitud entre un patron y otro.
+                
+                if (not(isempty(px)) && length(px)>2)
                     
-                    res= corr(D_TRACK.data(1:end-3,:));
+                    %>> analizamos las combinaciones de puntos
+                    [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_frame_id, px,POL, 0);
                     
-                    %>> obtenemos las coordenadas
-                    poss_xy= D_TRACK.data(end-1:end,:);
-                    %>> obtenemos los indices de dichos frames
-                    id_frame_id = D_TRACK.data(end-2,:);
-                    
-                    %>> buscamos solo las coordenadas que sean correspondientes
-                    [px,~ ] =find(res>factor_corr & res < 1);
-                    
-                    %>> si no esta vacio significa que existe una relación de
-                    %   similitud entre un patron y otro.
-                    
-                    if (not(isempty(px)) && length(px)>2)
+                    %>> si obtengo más de dos puntos en correspondencias
+                    if (size(SEL,2)>=5)
                         
-                        %>> analizamos las combinaciones de puntos
-                        [SEL, id_frames, POL_SEL] =ransac_full(poss_xy, id_frame_id, px,POL, 0);
+                        hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
                         
-                        %>> si obtengo más de dos puntos en correspondencias
-                        if (size(SEL,2)>=4)
-                            
-                            hold on; plot(SEL(1,:), SEL(2,:), 'ys', 'markerSize',5,'LineWidth',2);
-                            
-                            %>> INTERSECCION
-                            %seleccionamos el polinomio
-                            P= [POL_SEL 1];
-                            PT= cross(PL,P); %PL polinomio recta de borde
-                            inter= PT./PT(2); %punto de interseccion entre recta
-                            xy_cross=[inter(1), -inter(3)];
-                            
-                            
-                            %>> ploteamos la linea de tendencia.
-                            yfit=P(1)*xa'+P(2);
-                            hold on;plot(xa, yfit,'m-.');drawnow;
-                            plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
-                            plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
-                            
-                            %>> prediccion del frame
-                            pred_frame = dist_pts(xy_cross',SEL,id_frames, frame_id , xa, yfit, radio_px)
-                            
-                            %>> agregamos el polinomio a un registro
-                            D_POLY = add_poly(D_POLY, P, xa, yfit, frame_id, pred_frame, xy_cross, max_frames);
-                            sw=1;
-                        end
+                        %>> INTERSECCION
+                        %seleccionamos el polinomio
+                        P= [POL_SEL 1];
+                        PT= cross(PL,P); %PL polinomio recta de borde
+                        inter= PT./PT(2); %punto de interseccion entre recta
+                        xy_cross=[inter(1), -inter(3)];
+                        
+                        
+                        %>> ploteamos la linea de tendencia.
+                        yfit=P(1)*xa'+P(2);
+                        hold on;plot(xa, yfit,'m-.');drawnow;
+                        plot(SEL(1,:), SEL(2,:), 'yx', 'markerSize',6)
+                        plot(xy_cross(1), xy_cross(2),'gs','markerSize',15, 'lineWidth',3);
+                        
+                        %>> prediccion del frame
+                        pred_frame = dist_pts(xy_cross',SEL,id_frames, frame_id , xa, yfit, radio_px)
+                        
+                        %>> agregamos el polinomio a un registro
+                        D_POLY = add_poly(D_POLY, P, xa, yfit, frame_id, pred_frame, xy_cross, max_frames);
+                        sw=1;
                     end
-                    
-                    
-                catch
-                    fprintf('waiting for more frames... \n')
                 end
+                
+                
+                % catch
+                %   fprintf('waiting for more frames... \n')
+                %end
             end %fin output
             %
             
@@ -215,9 +234,7 @@ while hasFrame(v)
             %end
         end%
         
-        fprintf('%s',msge);
-     
-        frame_id= frame_id+1;
+        
         
     end
     
@@ -226,16 +243,16 @@ while hasFrame(v)
         writeVideo(myVideo,F.cdata);
     else
         F=getframe();
-        for i=1:40
+        for i=1:20
             writeVideo(myVideo,F.cdata);
         end
         sw=0;
     end
     
-    
-    if (frame_id>300)
-        break;
-    end
+       
+    fprintf('%s',msge);
+        
+    frame_id= frame_id+1;
     
 end
 close(myVideo);
@@ -285,60 +302,5 @@ if (draw)
 end
 end
 
-%%
-function D= xy_ray(ima, center, radio_px, frame_id, k, draw)
-
-angle=0:1:359;
-radian=deg2rad(angle);
-
-M=radio_px.*[sin(radian)', cos(radian)']+repmat(center,length(angle),1);
-CO=repmat(center,length(angle),1);
-xi=[CO(:,1), M(:,1)];
-yi = [CO(:,2), M(:,2)];
-D=[];
-
-for t=1:length(angle)
-    D(t,:)=improfile(ima, xi(t,:),yi(t,:), radio_px);
-end
-
-%bw= D>0;
-%[I,J]= find(bw==1);
-%idx  = find(bw==1);
-%C= double(D(idx))./255;
-%HA= hu(I,J,C);
-
-if (draw)
-    hold on
-    plot(xi, yi, 'r.'); drawnow;
-    hold off
-end
-
-sw=0;
-if (frame_id>350 && sw)
-    % Construct a questdlg with three options
-    choice = questdlg('Es bola?', ...
-        'Opciones', ...
-        'Yes','No', 'No');
-    % Handle response
-    switch choice
-        case 'Yes'
-            disp([choice ' Es bola.'])
-            hold on
-            plot(xi, yi, 'r.'); drawnow;
-            hold off
-            option = 1;
-        case 'No'
-            disp([choice ' No es bola.'])
-            option = 0;
-    end
-    %dat = [HA, option];
-    
-    s=sprintf('data/region_move_%i_%i.mat',frame_id,k);
-    save(s,'D', 'dat');
-end
-%imwrite(uint8(D),s);
-%figure, surf(D);
-%shading interp;
-end
 
 
